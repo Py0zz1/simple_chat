@@ -3,7 +3,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <sys/file.h>
 
 #define BUF_SIZE 1024
 #define MAX_CLIENT 5
@@ -11,7 +10,6 @@
 
 int main(int argc, char **argv)
 {
-
     if(argc != 2)
     {
         printf("Using %s [PORT]\n",argv[0]);
@@ -20,7 +18,7 @@ int main(int argc, char **argv)
     int S_sock,C_sock[MAX_CLIENT],C_len,C_fd;
     int C_join_num=0,max_fd,chk;
     struct sockaddr_in S_addr,C_addr;
-    fd_set read_fd;
+    fd_set read_fd;     //socket Input Detected FD
     char buf[BUF_SIZE];
 
     if((S_sock = socket(AF_INET,SOCK_STREAM,0)) < 0 )
@@ -43,24 +41,25 @@ int main(int argc, char **argv)
         printf("LISTEN ERROR!\n");
         exit(0);
     }
-    max_fd = S_sock+1;
-    FD_ZERO(&read_fd);
+    max_fd = S_sock+1;          //Select() First_Param current FD+1
+    FD_ZERO(&read_fd);          //Input fd set 0
     printf("CLIENT JOIN WAITING...\n");
     while(1)
     {
         memset(buf,0,BUF_SIZE);
         if((C_join_num-1) >= 0) max_fd = C_sock[C_join_num-1]+1;
-        FD_SET(S_sock,&read_fd);
+        FD_SET(S_sock,&read_fd);        //S_sock Select() SET
 
         for(int i=0; i<C_join_num; i++)
-            FD_SET(C_sock[i],&read_fd);
-
+            FD_SET(C_sock[i],&read_fd); //Add C_sock Select() SET
+        //I/O => ON/OFF Detecting
         if(select(max_fd,&read_fd,(fd_set *)0,(fd_set *)0,(struct timeval *)0) < 0)
         {
             printf("SELECT ERROR!\n");
             exit(0);
         }
-
+        //Client_Connect Request ( Server read_fd ON )
+        //MAX_CLIENT : 5
         if(C_join_num < 5 && FD_ISSET(S_sock,&read_fd))
         {
             C_len = sizeof(C_addr);
@@ -77,6 +76,7 @@ int main(int argc, char **argv)
             printf("NUM(%d) CLIENT JOIN\n",C_join_num);
         }
 
+        //Client_recv Request ( Client[i] read_fd ON )
         for(int i=0; i<C_join_num; i++)
         {
             if(FD_ISSET(C_sock[i],&read_fd))
@@ -86,6 +86,7 @@ int main(int argc, char **argv)
                 {
                     buf[chk]='\0';
                 }
+                //Input "exit" Client EXIT
                 if(strcmp(buf,"exit\n")==0)
                 {
                     printf("CLIENT EXIT..!\nREMIND CLIENT(%d)\n",i);
@@ -93,8 +94,10 @@ int main(int argc, char **argv)
                     continue;
                 }
 
+                //Broadcast
                 for(int j=0; j<C_join_num; j++)
                     send(C_sock[j],buf,chk,0);
+
                 printf("RECV_MSG : %s\n",buf);
             }
         }
