@@ -5,7 +5,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
-#include <signal.h>
 
 #define BUF_SIZE 1024
 
@@ -35,13 +34,15 @@ int main(int argc, char **argv)
         printf("CONNECT ERROR!\n");
         exit(0);
     }
+
     printf("SERVER JOIN..!\n");
-    FD_ZERO(&read_fd);
+    FD_ZERO(&read_fd);      //INPUT fd set 0
 
     while(1)
     {
-        FD_SET(0,&read_fd);
-        FD_SET(C_sock,&read_fd);
+
+        FD_SET(0,&read_fd);     //No Request
+        FD_SET(C_sock,&read_fd);    //Server Request
 
         if(select((C_sock+1),&read_fd,(fd_set *)0,(fd_set *)0,(struct timeval *)0) < 0)
         {
@@ -49,6 +50,7 @@ int main(int argc, char **argv)
             exit(0);
         }
 
+        //Server Request Detecting
         if(FD_ISSET(C_sock,&read_fd))
         {
             if((chk = recv(C_sock,buf,BUF_SIZE,0)) > 0)
@@ -57,6 +59,8 @@ int main(int argc, char **argv)
                 printf("\t\tSERVER SAY: %s",buf);
             }
         }
+
+        //No Request
         if(FD_ISSET(0,&read_fd))
         {
             if(fgets(buf,BUF_SIZE,stdin) != NULL)
@@ -67,6 +71,7 @@ int main(int argc, char **argv)
                     printf("SEND ERROR!\n");
                     exit(0);
                 }
+                //Input "exit" close socket
                 if(strcmp(buf,"exit\n") == 0)
                 {
                     printf("EXIT NOW..!\n");
